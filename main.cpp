@@ -220,21 +220,28 @@ void FinishRound(Game& game, bool won, const std::string& message) {
         game.streak += 1;
         game.roundPoints = 100 + (game.streak - 1) * 25;
         game.score += game.roundPoints;
-        if (game.streak % 3 == 0 && game.level < 3) {
-            game.level += 1;
-            game.resultMessage = "RANK UP! You are now a " + std::string(RankName(game.level)) +
-                                 ". " + game.resultMessage;
-        }
+
+        const bool rankedUp = game.streak % 3 == 0 && game.level < 3;
+        if (rankedUp) ++game.level;
+
+        const bool newBestLevel = game.level > game.bestLevel;
         game.bestLevel = std::max(game.bestLevel, game.level);
-        if (game.score > game.bestScore || game.streak > game.bestStreak ||
-            game.bestLevel < game.level) {
-            game.bestScore = std::max(game.bestScore, game.score);
-            game.bestStreak = std::max(game.bestStreak, game.streak);
+        game.bestScore = std::max(game.bestScore, game.score);
+        game.bestStreak = std::max(game.bestStreak, game.streak);
+        if (newBestLevel || game.score == game.bestScore || game.streak == game.bestStreak) {
             SaveRecords(game);
         }
+
+        game.resultMessage = rankedUp
+            ? "RANK UP! You are now a " + std::string(RankName(game.level)) +
+              ". +" + std::to_string(game.roundPoints) + " points."
+            : "Correct! +" + std::to_string(game.roundPoints) +
+              " points. Streak: " + std::to_string(game.streak) + ".";
         SpawnConfetti(game);
     } else {
         game.streak = 0;
+        game.resultMessage += " Your " + std::string(RankName(game.level)) + " rank is saved.";
+        SaveRecords(game);
     }
 }
 
@@ -500,31 +507,27 @@ int main() {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(kCanvasWidth, kCanvasHeight, "Unlock the Door - Culinary Challenge");
     SetWindowMinSize(800, 600);
-        const bool rankedUp = game.streak % 3 == 0 && game.level < 3;
-        if (rankedUp) {
+    SetTargetFPS(60);
 
     Game game;
-                                 ". +" + std::to_string(game.roundPoints) + " points.";
-        } else {
-            game.resultMessage = "Correct! +" + std::to_string(game.roundPoints) +
-                                 " points. Streak: " + std::to_string(game.streak) + ".";
+    LoadRecords(game);
 #if defined(_WIN32)
-        const bool newBestLevel = game.level > game.bestLevel;
     if (FileExists("C:/Windows/Fonts/trebuc.ttf")) {
         Font font = LoadFontEx("C:/Windows/Fonts/trebuc.ttf", 64, nullptr, 0);
-            newBestLevel) {
+        if (font.texture.id != 0) {
             game.font = font;
             game.ownsFont = true;
         }
     }
 #endif
 
-        game.resultMessage += " Your " + std::string(RankName(game.level)) + " rank is saved.";
     while (!WindowShouldClose()) {
         const float deltaTime = GetFrameTime();
         game.elapsed += deltaTime;
         UpdateConfetti(game, deltaTime);
-        if (game.screen == Screen::Quiz) game.doorOpen = std::min(1.0f, game.doorOpen + deltaTime * 1.15f);
+        if (game.screen == Screen::Quiz) {
+            game.doorOpen = std::min(1.0f, game.doorOpen + deltaTime * 1.15f);
+        }
 
         const float scale = std::min(GetScreenWidth() / static_cast<float>(kCanvasWidth),
                                      GetScreenHeight() / static_cast<float>(kCanvasHeight));
@@ -561,7 +564,7 @@ int main() {
                 break;
         }
 
-        DrawLeft("UNLOCK THE DOOR  /  CULINARY TRIALS", 42.0f, 766.0f,
+        DrawLeft("UNLOCK THE DOOR / CULINARY TRIALS", 42.0f, 766.0f,
                  11.0f, Fade(kMuted, 0.65f), game.font, 2.0f);
         EndMode2D();
         EndDrawing();
