@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3efe5">
+  <title>Unlock the Door</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202c31;
+      --muted: #657176;
+      --paper: #f3efe5;
+      --panel: #fffdf7;
+      --line: #d9d5ca;
+      --green: #2d7565;
+      --green-dark: #205b4e;
+      --coral: #dc684d;
+      --gold: #e2b34e;
+      --door: #bf674a;
+      --door-dark: #944b38;
+      --shadow: 0 18px 40px rgba(37, 46, 45, .10);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background-color: var(--paper);
+      background-image: radial-gradient(#d5d0c2 0.7px, transparent 0.7px);
+      background-size: 18px 18px;
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    }
+
+    button { font: inherit; }
+
+    .page {
+      width: min(100% - 32px, 920px);
+      margin: 0 auto;
+      padding: 32px 0 44px;
+    }
+
+    .topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .brand { display: flex; align-items: center; gap: 9px; }
+    .brand-mark {
+      display: grid;
+      width: 28px;
+      aspect-ratio: 1;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--green);
+      color: white;
+      font-size: 16px;
+    }
+
+    .round-pill {
+      padding: 8px 11px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 253, 247, .75);
+      letter-spacing: .04em;
+    }
+
+    main { padding-top: 42px; }
+
+    .intro { text-align: center; }
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--coral);
+      font-size: .76rem;
+      font-weight: 900;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(2.6rem, 7vw, 4.7rem);
+      font-weight: 700;
+      line-height: .98;
+    }
+
+    .subtitle {
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 1.04rem;
+      line-height: 1.5;
+    }
+
+    .game-board {
+      position: relative;
+      margin: 32px auto 0;
+      padding: 27px clamp(16px, 5vw, 48px) 34px;
+      border: 1px solid rgba(217, 213, 202, .9);
+      border-radius: 14px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .status {
+      min-height: 28px;
+      margin: 0 0 22px;
+      color: var(--green-dark);
+      text-align: center;
+      font-size: 1rem;
+      font-weight: 800;
+    }
+
+    .doors {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      align-items: end;
+      gap: clamp(12px, 5vw, 42px);
+      max-width: 650px;
+      margin: 0 auto;
+    }
+
+    .door-choice {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: .8rem;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .door {
+      position: relative;
+      display: block;
+      width: min(100%, 142px);
+      aspect-ratio: .72;
+      overflow: hidden;
+      border: 7px solid #e9dfcd;
+      border-bottom: 0;
+      border-radius: 72px 72px 0 0;
+      background: var(--door);
+      box-shadow: inset 7px 0 rgba(255,255,255,.08), inset -8px 0 rgba(0,0,0,.10), 0 7px 0 #d7cbb6;
+      transition: transform .18s ease, filter .18s ease, background .2s ease;
+    }
+
+    .door::before {
+      position: absolute;
+      inset: 14px 13px 0;
+      border: 2px solid rgba(255, 232, 197, .48);
+      border-bottom: 0;
+      border-radius: 55px 55px 0 0;
+      content: "";
+    }
+
+    .door::after {
+      position: absolute;
+      top: 56%;
+      right: 17%;
+      width: 10px;
+      aspect-ratio: 1;
+      border: 3px solid #f3ce72;
+      border-radius: 50%;
+      background: #72583a;
+      content: "";
+    }
+
+    .door-choice:hover:not(:disabled) .door,
+    .door-choice:focus-visible .door {
+      transform: translateY(-7px);
+      filter: brightness(1.08);
+    }
+
+    .door-choice:focus-visible { outline: 3px solid var(--green); outline-offset: 6px; border-radius: 8px; }
+    .door-choice:disabled { cursor: default; }
+    .door-choice.is-winner .door { background: var(--green); }
+    .door-choice.is-loser .door { background: #858d89; filter: saturate(.55); }
+    .door-choice.is-picked .door { transform: translateY(-7px); }
+
+    .door-number {
+      position: absolute;
+      top: 39%;
+      left: 50%;
+      color: rgba(255,255,255,.7);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 1.8rem;
+      transform: translate(-50%, -50%);
+    }
+
+    .divider {
+      height: 1px;
+      margin: 30px auto 24px;
+      max-width: 650px;
+      background: var(--line);
+    }
+
+    .quiz {
+      max-width: 590px;
+      margin: 0 auto;
+      animation: arrive .28s ease-out both;
+    }
+
+    .quiz[hidden], .result[hidden] { display: none; }
+    .quiz-label {
+      margin: 0 0 8px;
+      color: var(--coral);
+      font-size: .73rem;
+      font-weight: 900;
+      letter-spacing: .14em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .question {
+      margin: 0 0 18px;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.3rem, 4vw, 1.8rem);
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    .answers {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .answer {
+      min-height: 48px;
+      padding: 11px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: white;
+      color: var(--ink);
+      cursor: pointer;
+      font-weight: 800;
+      transition: border-color .15s ease, background .15s ease, transform .15s ease;
+    }
+
+    .answer:hover:not(:disabled) { transform: translateY(-2px); border-color: var(--green); background: #f0f7f2; }
+    .answer:focus-visible, .retry:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+    .answer:disabled { cursor: default; }
+    .answer.correct { border-color: var(--green); background: #e2f0e9; color: var(--green-dark); }
+    .answer.incorrect { border-color: var(--coral); background: #fff0eb; color: #9f3f2b; }
+
+    .result {
+      padding: 4px 0 0;
+      text-align: center;
+      animation: arrive .28s ease-out both;
+    }
+
+    .result h2 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(1.7rem, 5vw, 2.4rem);
+    }
+
+    .result p { margin: 8px 0 18px; color: var(--muted); line-height: 1.5; }
+
+    .retry {
+      min-height: 46px;
+      padding: 0 20px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--green);
+      color: white;
+      cursor: pointer;
+      font-weight: 900;
+      transition: background .15s ease, transform .15s ease;
+    }
+
+    .retry:hover { transform: translateY(-2px); background: var(--green-dark); }
+
+    .footer-note {
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: .78rem;
+      text-align: center;
+    }
+
+    @keyframes arrive {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 520px) {
+      .page { width: min(100% - 22px, 920px); padding-top: 20px; }
+      main { padding-top: 32px; }
+      .game-board { margin-top: 25px; padding: 21px 14px 25px; }
+      .doors { gap: 10px; }
+      .door { border-width: 5px; }
+      .door::before { inset: 10px 8px 0; }
+      .door::after { width: 8px; border-width: 2px; }
+      .door-number { font-size: 1.35rem; }
+      .door-choice { font-size: .68rem; letter-spacing: .08em; }
+      .answers { gap: 8px; }
+      .answer { padding: 10px 7px; font-size: .9rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="topline">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">LD</span><span>Little Door Games</span></div>
+      <div class="round-pill" id="roundLabel">Round 1</div>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="title">
+        <p class="eyebrow">A game of luck &amp; knowledge</p>
+        <h1 id="title">Unlock the Door</h1>
+        <p class="subtitle">One door is the winner. Pick it, then prove your culinary know-how.</p>
+      </section>
+
+      <section class="game-board" aria-label="Game">
+        <p class="status" id="status" aria-live="polite">Choose one of the three doors.</p>
+
+        <div class="doors" id="doors" aria-label="Choose a door">
+          <button class="door-choice" type="button" data-door="1" aria-label="Choose door 1">
+            <span class="door"><span class="door-number">01</span></span><span>Door One</span>
+          </button>
+          <button class="door-choice" type="button" data-door="2" aria-label="Choose door 2">
+            <span class="door"><span class="door-number">02</span></span><span>Door Two</span>
+          </button>
+          <button class="door-choice" type="button" data-door="3" aria-label="Choose door 3">
+            <span class="door"><span class="door-number">03</span></span><span>Door Three</span>
+          </button>
+        </div>
+
+        <div class="divider" id="divider"></div>
+
+        <section class="quiz" id="quiz" aria-labelledby="question" hidden>
+          <p class="quiz-label">Final test</p>
+          <h2 class="question" id="question">Which cooking method submerges food in hot oil?</h2>
+          <div class="answers" id="answers">
+            <button class="answer" type="button" data-correct="false">Braising</button>
+            <button class="answer" type="button" data-correct="true">Deep-frying</button>
+            <button class="answer" type="button" data-correct="false">Poaching</button>
+            <button class="answer" type="button" data-correct="false">Roasting</button>
+          </div>
+        </section>
+
+        <section class="result" id="result" aria-live="polite" hidden>
+          <h2 id="resultTitle"></h2>
+          <p id="resultMessage"></p>
+          <button class="retry" id="retry" type="button">Play again</button>
+        </section>
+      </section>
+      <p class="footer-note">Choose carefully. The winning door changes every round.</p>
+    </main>
+  </div>
+
+  <script>
+    const doorButtons = [...document.querySelectorAll(".door-choice")];
+    const answerButtons = [...document.querySelectorAll(".answer")];
+    const statusText = document.querySelector("#status");
+    const quiz = document.querySelector("#quiz");
+    const result = document.querySelector("#result");
+    const resultTitle = document.querySelector("#resultTitle");
+    const resultMessage = document.querySelector("#resultMessage");
+    const roundLabel = document.querySelector("#roundLabel");
+    const divider = document.querySelector("#divider");
+    let winningDoor = 0;
+    let round = 0;
+
+    function startRound() {
+      round += 1;
+      winningDoor = Math.floor(Math.random() * 3) + 1;
+      roundLabel.textContent = `Round ${round}`;
+      statusText.textContent = "Choose one of the three doors.";
+      quiz.hidden = true;
+      result.hidden = true;
+      divider.hidden = false;
+
+      doorButtons.forEach((button) => {
+        button.disabled = false;
+        button.classList.remove("is-winner", "is-loser", "is-picked");
+      });
+      answerButtons.forEach((button) => {
+        button.disabled = false;
+        button.classList.remove("correct", "incorrect");
+      });
+    }
+
+    function finishGame(won, message) {
+      quiz.hidden = true;
+      result.hidden = false;
+      divider.hidden = true;
+      resultTitle.textContent = won ? "The door is open!" : "The door stays locked.";
+      resultMessage.textContent = message;
+      statusText.textContent = won ? "You won this round!" : "You lost this round.";
+    }
+
+    doorButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const chosenDoor = Number(button.dataset.door);
+        doorButtons.forEach((door) => {
+          door.disabled = true;
+          const doorNumber = Number(door.dataset.door);
+          if (doorNumber === winningDoor) door.classList.add("is-winner");
+          else door.classList.add("is-loser");
+          if (doorNumber === chosenDoor) door.classList.add("is-picked");
+        });
+
+        if (chosenDoor !== winningDoor) {
+          statusText.textContent = `Door ${winningDoor} was the winning door.`;
+          finishGame(false, `You chose door ${chosenDoor}; door ${winningDoor} was the winner. Try your luck again?`);
+          return;
+        }
+
+        statusText.textContent = "You found the winning door. Answer the question to unlock it!";
+        quiz.hidden = false;
+        divider.hidden = true;
+        answerButtons[0].focus();
+      });
+    });
+
+    answerButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const correct = button.dataset.correct === "true";
+        answerButtons.forEach((answer) => {
+          answer.disabled = true;
+          if (answer.dataset.correct === "true") answer.classList.add("correct");
+        });
+        if (!correct) button.classList.add("incorrect");
+
+        finishGame(
+          correct,
+          correct
+            ? "You picked the right door and answered correctly. Nicely done!"
+            : "The correct answer was deep-frying. Give it another try?"
+        );
+      });
+    });
+
+    document.querySelector("#retry").addEventListener("click", startRound);
+    startRound();
+  </script>
+</body>
+</html>
