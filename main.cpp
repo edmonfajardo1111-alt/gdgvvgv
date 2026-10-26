@@ -25,28 +25,31 @@ const Color kDoorFrame{87, 56, 43, 255};
 const Color kDoorColor{173, 82, 58, 255};
 
 struct Question {
+    int level;
     const char* prompt;
     std::array<const char*, kAnswerCount> answers;
     int correctAnswer;
 };
 
-const std::array<Question, 8> kQuestions{{
-    {"Which method cooks food fully submerged in hot oil?",
-     {"Poaching", "Deep-frying", "Braising", "Roasting"}, 1},
-    {"What is the main herb in a traditional Genovese pesto?",
-     {"Parsley", "Mint", "Basil", "Cilantro"}, 2},
-    {"What does 'al dente' describe?",
-     {"Firm to the bite", "Cooked until crisp", "Served chilled", "Cooked in broth"}, 0},
-    {"What is the main ingredient in hummus?",
-     {"Lentils", "White beans", "Green peas", "Chickpeas"}, 3},
-    {"Which mixture of flour and fat is used to thicken sauces?",
-     {"Ganache", "Roux", "Meringue", "Custard"}, 1},
-    {"Which cut makes tiny, uniform cubes?",
-     {"Julienne", "Chiffonade", "Brunoise", "Batonnet"}, 2},
-    {"What does it mean to blanch vegetables?",
-     {"Cook briefly, then cool quickly", "Roast until browned", "Cook slowly in fat", "Dry in the sun"}, 0},
-    {"Which pastry gets its flaky layers from folding butter into dough?",
-     {"Shortcrust", "Choux", "Filo", "Puff pastry"}, 3}
+const std::array<Question, 9> kQuestions{{
+    {1, "What is the main ingredient in classic hummus?",
+     {"Chickpeas", "Lentils", "White beans", "Green peas"}, 0},
+    {1, "Which herb gives classic pesto its signature flavor?",
+     {"Mint", "Basil", "Parsley", "Dill"}, 1},
+    {1, "What does 'al dente' mean when cooking pasta?",
+     {"Very soft", "Cooked in cream", "Firm to the bite", "Served cold"}, 2},
+    {2, "A roux is made by cooking which two ingredients together?",
+     {"Cream and eggs", "Oil and water", "Sugar and butter", "Flour and fat"}, 3},
+    {2, "What happens when you blanch vegetables?",
+     {"Briefly boil, then cool quickly", "Roast until deeply browned", "Cook slowly in oil", "Dry them in the oven"}, 0},
+    {2, "When you saute, how is the food cooked?",
+     {"Submerged in water", "Quickly in a little hot fat", "Slowly under a lid", "Over indirect smoke"}, 1},
+    {3, "In a professional kitchen, what is 'mise en place'?",
+     {"A slow braise", "A pastry fold", "Everything prepared and in its place", "A finishing sauce"}, 2},
+    {3, "Beurre blanc is an emulsion sauce built mainly from butter and what?",
+     {"Tomatoes and stock", "Egg yolks and oil", "Cream and cheese", "White wine and vinegar"}, 3},
+    {3, "A julienne cut produces what shape?",
+     {"Thin matchsticks", "Small cubes", "Wide ribbons", "Round slices"}, 0}
 }};
 
 enum class Screen {
@@ -77,6 +80,8 @@ struct Game {
     int streak{0};
     int bestScore{0};
     int bestStreak{0};
+    int level{1};
+    int bestLevel{1};
     int round{0};
     int roundPoints{0};
     bool won{false};
@@ -126,14 +131,26 @@ bool DrawButton(Rectangle bounds, const std::string& text, Vector2 mouse,
     return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
+const char* RankName(int level) {
+    switch (level) {
+        case 2: return "LINE COOK";
+        case 3: return "HEAD CHEF";
+        default: return "HOME COOK";
+    }
+}
+
 void LoadRecords(Game& game) {
     std::ifstream input("unlock_records.txt");
-    if (input) input >> game.bestScore >> game.bestStreak;
+    if (input && input >> game.bestScore >> game.bestStreak) {
+        input >> game.bestLevel;
+        game.bestLevel = std::clamp(game.bestLevel, 1, 3);
+        game.level = game.bestLevel;
+    }
 }
 
 void SaveRecords(const Game& game) {
     std::ofstream output("unlock_records.txt", std::ios::trunc);
-    if (output) output << game.bestScore << ' ' << game.bestStreak << '\n';
+    if (output) output << game.bestScore << ' ' << game.bestStreak << ' ' << game.bestLevel << '\n';
 }
 
 void SpawnConfetti(Game& game) {
@@ -157,9 +174,6 @@ void SpawnConfetti(Game& game) {
 
 void StartRound(Game& game) {
     std::uniform_int_distribution<int> doorDistribution(0, 2);
-    std::uniform_int_distribution<int> questionDistribution(
-        0, static_cast<int>(kQuestions.size()) - 1);
-
     game.winningDoor = doorDistribution(game.random);
     game.chosenDoor = -1;
     game.round += 1;
@@ -170,9 +184,19 @@ void StartRound(Game& game) {
     game.resultMessage.clear();
     game.confetti.clear();
 
-    do {
-        game.questionIndex = questionDistribution(game.random);
-    } while (game.questionIndex == game.lastQuestionIndex && kQuestions.size() > 1);
+    std::vector<int> eligibleQuestions;
+    for (std::size_t i = 0; i < kQuestions.size(); ++i) {
+        if (kQuestions[i].level == game.level && static_cast<int>(i) != game.lastQuestionIndex) {
+            eligibleQuestions.push_back(static_cast<int>(i));
+        }
+    }
+    if (eligibleQuestions.empty()) {
+        for (std::size_t i = 0; i < kQuestions.size(); ++i) {
+            if (kQuestions[i].level == game.level) eligibleQuestions.push_back(static_cast<int>(i));
+        }
+    }
+    std::uniform_int_distribution<std::size_t> questionDistribution(0, eligibleQuestions.size() - 1);
+    game.questionIndex = eligibleQuestions[questionDistribution(game.random)];
     game.lastQuestionIndex = game.questionIndex;
 
     game.answerOrder = {0, 1, 2, 3};
@@ -193,10 +217,17 @@ void FinishRound(Game& game, bool won, const std::string& message) {
     game.screen = Screen::Result;
 
     if (won) {
-        game.roundPoints = 100 + game.streak * 25;
-        game.score += game.roundPoints;
         game.streak += 1;
-        if (game.score > game.bestScore || game.streak > game.bestStreak) {
+        game.roundPoints = 100 + (game.streak - 1) * 25;
+        game.score += game.roundPoints;
+        if (game.streak % 3 == 0 && game.level < 3) {
+            game.level += 1;
+            game.resultMessage = "RANK UP! You are now a " + std::string(RankName(game.level)) +
+                                 ". " + game.resultMessage;
+        }
+        game.bestLevel = std::max(game.bestLevel, game.level);
+        if (game.score > game.bestScore || game.streak > game.bestStreak ||
+            game.bestLevel < game.level) {
             game.bestScore = std::max(game.bestScore, game.score);
             game.bestStreak = std::max(game.bestStreak, game.streak);
             SaveRecords(game);
@@ -278,8 +309,12 @@ void DrawDoor(const Game& game, int index, bool revealed, Vector2 mouse) {
                    Fade(kGold, 0.15f + openAmount * 0.35f));
     }
 
-    DrawCentered("0" + std::to_string(index + 1), bounds.y + bounds.height + 17.0f,
-                 18.0f, isChosen ? kGold : kMuted, game.font, 2.0f);
+    const std::string number = "0" + std::to_string(index + 1);
+    const Vector2 numberSize = MeasureTextEx(game.font, number.c_str(), 18.0f, 2.0f);
+    DrawTextEx(game.font, number.c_str(),
+               {bounds.x + (bounds.width - numberSize.x) * 0.5f,
+                bounds.y + bounds.height + 17.0f},
+               18.0f, 2.0f, isChosen ? kGold : kMuted);
 }
 
 void DrawDoors(const Game& game, Vector2 mouse) {
@@ -290,8 +325,25 @@ void DrawDoors(const Game& game, Vector2 mouse) {
 void DrawHud(const Game& game) {
     DrawPill(72.0f, 30.0f, 170.0f, "SCORE", std::to_string(game.score), game.font);
     DrawPill(257.0f, 30.0f, 185.0f, "KITCHEN STREAK", std::to_string(game.streak), game.font);
+    DrawPill(472.0f, 30.0f, 240.0f, "CULINARY RANK", RankName(game.level), game.font);
     DrawPill(968.0f, 30.0f, 240.0f, "PERSONAL BEST", std::to_string(game.bestScore), game.font);
-    DrawCentered("ROUND " + std::to_string(game.round), 48.0f, 16.0f, kGold, game.font, 2.0f);
+    DrawCentered("ROUND " + std::to_string(game.round), 111.0f, 13.0f, kGold, game.font, 2.0f);
+}
+
+void DrawRankProgress(const Game& game, float y) {
+    const bool maxRank = game.level >= 3;
+    const std::string label = maxRank
+        ? "TOP RANK REACHED"
+        : std::to_string(3 - game.streak % 3) + " WINS TO " + RankName(game.level + 1);
+    DrawCentered(label, y, 12.0f, kMuted, game.font, 1.5f);
+
+    const Rectangle track{490.0f, y + 21.0f, 300.0f, 7.0f};
+    DrawRectangleRounded(track, 0.8f, 8, Fade(kLine, 0.8f));
+    const float progress = maxRank ? 1.0f : static_cast<float>(game.streak % 3) / 3.0f;
+    if (progress > 0.0f) {
+        DrawRectangleRounded({track.x, track.y, track.width * progress, track.height},
+                             0.8f, 8, kMint);
+    }
 }
 
 void UpdateConfetti(Game& game, float deltaTime) {
@@ -368,6 +420,7 @@ void DrawDoorScreen(Game& game, Vector2 mouse) {
     DrawCentered("CHOOSE YOUR DOOR", 154.0f, 24.0f, kCream, game.font, 3.0f);
     DrawCentered("Pick one. The culinary question only appears if you find the winner.",
                  198.0f, 17.0f, kMuted, game.font);
+    DrawRankProgress(game, 237.0f);
     DrawDoors(game, mouse);
     DrawCentered("Click a door or press 1, 2, or 3", 638.0f, 17.0f, kGold, game.font);
     DrawCentered("A wrong door ends the round. Your streak resets, but your best score stays.",
@@ -386,11 +439,13 @@ void AnswerQuestion(Game& game, int choice) {
 
 void DrawQuiz(Game& game, Vector2 mouse) {
     DrawHud(game);
+    DrawRankProgress(game, 172.0f);
     DrawDoors(game, mouse);
 
     DrawRectangleRounded({128.0f, 594.0f, 1024.0f, 176.0f}, 0.06f, 12, kPanel);
     DrawRectangleLinesEx({128.0f, 594.0f, 1024.0f, 176.0f}, 1.0f, kLine);
-    DrawLeft("CULINARY QUESTION", 158.0f, 608.0f, 13.0f, kGold, game.font, 2.0f);
+    DrawLeft(std::string(RankName(game.level)) + " CHALLENGE", 158.0f, 608.0f,
+             13.0f, kGold, game.font, 2.0f);
     DrawLeft(kQuestions[static_cast<std::size_t>(game.questionIndex)].prompt,
              158.0f, 632.0f, 22.0f, kCream, game.font);
 
@@ -412,6 +467,7 @@ void DrawQuiz(Game& game, Vector2 mouse) {
 
 void DrawResult(Game& game, Vector2 mouse) {
     DrawHud(game);
+    DrawRankProgress(game, 172.0f);
     DrawDoors(game, mouse);
 
     DrawRectangleRounded({290.0f, 575.0f, 700.0f, 195.0f}, 0.07f, 12, kPanel);
@@ -444,20 +500,26 @@ int main() {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
     InitWindow(kCanvasWidth, kCanvasHeight, "Unlock the Door - Culinary Challenge");
     SetWindowMinSize(800, 600);
-    SetTargetFPS(60);
+        const bool rankedUp = game.streak % 3 == 0 && game.level < 3;
+        if (rankedUp) {
 
     Game game;
-    LoadRecords(game);
+                                 ". +" + std::to_string(game.roundPoints) + " points.";
+        } else {
+            game.resultMessage = "Correct! +" + std::to_string(game.roundPoints) +
+                                 " points. Streak: " + std::to_string(game.streak) + ".";
 #if defined(_WIN32)
+        const bool newBestLevel = game.level > game.bestLevel;
     if (FileExists("C:/Windows/Fonts/trebuc.ttf")) {
         Font font = LoadFontEx("C:/Windows/Fonts/trebuc.ttf", 64, nullptr, 0);
-        if (font.texture.id != 0) {
+            newBestLevel) {
             game.font = font;
             game.ownsFont = true;
         }
     }
 #endif
 
+        game.resultMessage += " Your " + std::string(RankName(game.level)) + " rank is saved.";
     while (!WindowShouldClose()) {
         const float deltaTime = GetFrameTime();
         game.elapsed += deltaTime;

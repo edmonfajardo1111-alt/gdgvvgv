@@ -5,9 +5,10 @@ A native C++17 desktop game with a graphical interface, built with raylib.
 ## Features
 
 - Three animated doors; exactly one is the winning door each round.
-- Eight culinary questions with shuffled answer choices.
+- Nine culinary questions across three difficulty tiers, with shuffled answer choices.
+- Rank up from Home Cook to Line Cook to Head Chef after consecutive wins.
 - A score and kitchen-streak combo: consecutive correct answers earn bonus points.
-- Personal best score and streak saved locally in `unlock_records.txt`.
+- Unlocked rank, personal best score, and best streak saved locally in `unlock_records.txt`.
 - Mouse controls and keyboard shortcuts.
 - Confetti celebration, win/loss reveal, replay, and resizable window.
 

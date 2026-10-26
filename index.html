@@ -66,13 +66,23 @@
       font-size: 16px;
     }
 
+    .game-stats { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+
     .round-pill {
       padding: 8px 11px;
       border: 1px solid var(--line);
       border-radius: 999px;
       background: rgba(255, 253, 247, .75);
       letter-spacing: .04em;
+      white-space: nowrap;
     }
+
+    .round-pill.level { border-color: rgba(45, 117, 101, .45); color: var(--green-dark); }
+
+    .rank-progress { max-width: 430px; margin: -6px auto 25px; }
+    .progress-copy { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; color: var(--muted); font-size: .75rem; font-weight: 800; }
+    .progress-track { height: 7px; overflow: hidden; border-radius: 99px; background: #e8e4d9; }
+    .progress-fill { width: 0; height: 100%; border-radius: inherit; background: var(--green); transition: width .3s ease; }
 
     main { padding-top: 42px; }
 
@@ -299,8 +309,10 @@
       to { opacity: 1; transform: translateY(0); }
     }
 
-    @media (max-width: 520px) {
+    @media (max-width: 620px) {
       .page { width: min(100% - 22px, 920px); padding-top: 20px; }
+      .topline { align-items: flex-start; flex-wrap: wrap; }
+      .game-stats { justify-content: flex-start; }
       main { padding-top: 32px; }
       .game-board { margin-top: 25px; padding: 21px 14px 25px; }
       .doors { gap: 10px; }
@@ -322,7 +334,11 @@
   <div class="page">
     <header class="topline">
       <div class="brand"><span class="brand-mark" aria-hidden="true">LD</span><span>Little Door Games</span></div>
-      <div class="round-pill" id="roundLabel">Round 1</div>
+      <div class="game-stats" aria-label="Game progress">
+        <div class="round-pill" id="roundLabel">Round 1</div>
+        <div class="round-pill level" id="levelLabel">Level 1: Home Cook</div>
+        <div class="round-pill" id="scoreLabel">Score 0</div>
+      </div>
     </header>
 
     <main>
@@ -334,6 +350,10 @@
 
       <section class="game-board" aria-label="Game">
         <p class="status" id="status" aria-live="polite">Choose one of the three doors.</p>
+        <div class="rank-progress" aria-label="Progress to next culinary rank">
+          <div class="progress-copy"><span id="rankProgressLabel">Home Cook</span><span id="rankProgressCount">3 wins to Line Cook</span></div>
+          <div class="progress-track"><div class="progress-fill" id="rankProgressFill"></div></div>
+        </div>
 
         <div class="doors" id="doors" aria-label="Choose a door">
           <button class="door-choice" type="button" data-door="1" aria-label="Choose door 1">
@@ -350,14 +370,9 @@
         <div class="divider" id="divider"></div>
 
         <section class="quiz" id="quiz" aria-labelledby="question" hidden>
-          <p class="quiz-label">Final test</p>
-          <h2 class="question" id="question">Which cooking method submerges food in hot oil?</h2>
-          <div class="answers" id="answers">
-            <button class="answer" type="button" data-correct="false">Braising</button>
-            <button class="answer" type="button" data-correct="true">Deep-frying</button>
-            <button class="answer" type="button" data-correct="false">Poaching</button>
-            <button class="answer" type="button" data-correct="false">Roasting</button>
-          </div>
+          <p class="quiz-label" id="quizLabel">Home Cook challenge</p>
+          <h2 class="question" id="question"></h2>
+          <div class="answers" id="answers"></div>
         </section>
 
         <section class="result" id="result" aria-live="polite" hidden>
@@ -372,21 +387,95 @@
 
   <script>
     const doorButtons = [...document.querySelectorAll(".door-choice")];
-    const answerButtons = [...document.querySelectorAll(".answer")];
+    const answers = document.querySelector("#answers");
     const statusText = document.querySelector("#status");
     const quiz = document.querySelector("#quiz");
     const result = document.querySelector("#result");
     const resultTitle = document.querySelector("#resultTitle");
     const resultMessage = document.querySelector("#resultMessage");
     const roundLabel = document.querySelector("#roundLabel");
+    const levelLabel = document.querySelector("#levelLabel");
+    const scoreLabel = document.querySelector("#scoreLabel");
+    const rankProgressLabel = document.querySelector("#rankProgressLabel");
+    const rankProgressCount = document.querySelector("#rankProgressCount");
+    const rankProgressFill = document.querySelector("#rankProgressFill");
+    const quizLabel = document.querySelector("#quizLabel");
     const divider = document.querySelector("#divider");
+    const ranks = ["Home Cook", "Line Cook", "Head Chef"];
+    const questionBank = [
+      { id: "hummus", level: 1, prompt: "What is the main ingredient in classic hummus?", choices: ["Chickpeas", "Lentils", "White beans", "Green peas"], correct: 0 },
+      { id: "pesto", level: 1, prompt: "Which herb gives classic pesto its signature flavor?", choices: ["Mint", "Basil", "Parsley", "Dill"], correct: 1 },
+      { id: "al-dente", level: 1, prompt: "What does 'al dente' mean when cooking pasta?", choices: ["Very soft", "Cooked in cream", "Firm to the bite", "Served cold"], correct: 2 },
+      { id: "roux", level: 2, prompt: "A roux is made by cooking which two ingredients together?", choices: ["Cream and eggs", "Oil and water", "Sugar and butter", "Flour and fat"], correct: 3 },
+      { id: "blanch", level: 2, prompt: "What happens when you blanch vegetables?", choices: ["Briefly boil, then cool quickly", "Roast until deeply browned", "Cook slowly in oil", "Dry them in the oven"], correct: 0 },
+      { id: "saute", level: 2, prompt: "When you saute, how is the food cooked?", choices: ["Submerged in water", "Quickly in a little hot fat", "Slowly under a lid", "Over indirect smoke"], correct: 1 },
+      { id: "mise-en-place", level: 3, prompt: "In a professional kitchen, what is 'mise en place'?", choices: ["A slow braise", "A pastry fold", "Everything prepared and in its place", "A finishing sauce"], correct: 2 },
+      { id: "beurre-blanc", level: 3, prompt: "Beurre blanc is an emulsion sauce built mainly from butter and what?", choices: ["Tomatoes and stock", "Egg yolks and oil", "Cream and cheese", "White wine and vinegar"], correct: 3 },
+      { id: "julienne", level: 3, prompt: "A julienne cut produces what shape?", choices: ["Thin matchsticks", "Small cubes", "Wide ribbons", "Round slices"], correct: 0 }
+    ];
+    const savedStats = (() => {
+      try { return JSON.parse(localStorage.getItem("unlockDoorStats") || "{}"); }
+      catch { return {}; }
+    })();
+    let score = Number(savedStats.score) || 0;
+    let bestScore = Number(savedStats.bestScore) || 0;
+    let streak = Number(savedStats.streak) || 0;
+    let bestStreak = Number(savedStats.bestStreak) || 0;
+    let level = Math.max(1, Math.min(3, Number(savedStats.level) || 1));
     let winningDoor = 0;
     let round = 0;
+    let currentQuestion = null;
+    let lastQuestionId = "";
+
+    function updateHud() {
+      roundLabel.textContent = `Round ${round}`;
+      levelLabel.textContent = `Level ${level}: ${ranks[level - 1]}`;
+      scoreLabel.textContent = `Score ${score} | Best ${bestScore}`;
+      rankProgressLabel.textContent = ranks[level - 1];
+
+      if (level === 3) {
+        rankProgressCount.textContent = "TOP RANK";
+        rankProgressFill.style.width = "100%";
+      } else {
+        const winsTowardRank = streak % 3;
+        const remainingWins = 3 - winsTowardRank;
+        rankProgressCount.textContent = `${remainingWins} ${remainingWins === 1 ? "win" : "wins"} to ${ranks[level]}`;
+        rankProgressFill.style.width = `${(winsTowardRank / 3) * 100}%`;
+      }
+    }
+
+    function saveStats() {
+      localStorage.setItem("unlockDoorStats", JSON.stringify({ score, bestScore, streak, bestStreak, level }));
+    }
+
+    function prepareQuestion() {
+      const pool = questionBank.filter((question) => question.level === level);
+      const freshPool = pool.filter((question) => question.id !== lastQuestionId);
+      const selectedPool = freshPool.length ? freshPool : pool;
+      currentQuestion = selectedPool[Math.floor(Math.random() * selectedPool.length)];
+      lastQuestionId = currentQuestion.id;
+      quizLabel.textContent = `${ranks[level - 1]} challenge`;
+      document.querySelector("#question").textContent = currentQuestion.prompt;
+
+      const order = [0, 1, 2, 3];
+      for (let i = order.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [order[i], order[j]] = [order[j], order[i]];
+      }
+      answers.replaceChildren(...order.map((choiceIndex, index) => {
+        const button = document.createElement("button");
+        button.className = "answer";
+        button.type = "button";
+        button.dataset.correct = String(choiceIndex === currentQuestion.correct);
+        button.textContent = `${index + 1}. ${currentQuestion.choices[choiceIndex]}`;
+        return button;
+      }));
+    }
 
     function startRound() {
       round += 1;
       winningDoor = Math.floor(Math.random() * 3) + 1;
-      roundLabel.textContent = `Round ${round}`;
+      updateHud();
       statusText.textContent = "Choose one of the three doors.";
       quiz.hidden = true;
       result.hidden = true;
@@ -396,17 +485,33 @@
         button.disabled = false;
         button.classList.remove("is-winner", "is-loser", "is-picked");
       });
-      answerButtons.forEach((button) => {
-        button.disabled = false;
-        button.classList.remove("correct", "incorrect");
-      });
     }
 
     function finishGame(won, message) {
+      let leveledUp = false;
+      if (won) {
+        streak += 1;
+        const points = 100 + (streak - 1) * 25;
+        score += points;
+        bestScore = Math.max(bestScore, score);
+        bestStreak = Math.max(bestStreak, streak);
+        if (streak % 3 === 0 && level < 3) {
+          level += 1;
+          leveledUp = true;
+        }
+        message = leveledUp
+          ? `+${points} points. Rank up! You are now a ${ranks[level - 1]}.`
+          : `+${points} points. Current streak: ${streak}. ${message}`;
+      } else {
+        streak = 0;
+        message += ` Your ${ranks[level - 1]} rank is saved.`;
+      }
+      saveStats();
+      updateHud();
       quiz.hidden = true;
       result.hidden = false;
       divider.hidden = true;
-      resultTitle.textContent = won ? "The door is open!" : "The door stays locked.";
+      resultTitle.textContent = leveledUp ? `Rank up: ${ranks[level - 1]}!` : won ? "The door is open!" : "The door stays locked.";
       resultMessage.textContent = message;
       statusText.textContent = won ? "You won this round!" : "You lost this round.";
     }
@@ -429,16 +534,18 @@
         }
 
         statusText.textContent = "You found the winning door. Answer the question to unlock it!";
+        prepareQuestion();
         quiz.hidden = false;
         divider.hidden = true;
-        answerButtons[0].focus();
+        answers.querySelector("button")?.focus();
       });
     });
 
-    answerButtons.forEach((button) => {
-      button.addEventListener("click", () => {
+    answers.addEventListener("click", (event) => {
+      const button = event.target.closest(".answer");
+      if (!button || button.disabled) return;
         const correct = button.dataset.correct === "true";
-        answerButtons.forEach((answer) => {
+        answers.querySelectorAll(".answer").forEach((answer) => {
           answer.disabled = true;
           if (answer.dataset.correct === "true") answer.classList.add("correct");
         });
@@ -448,12 +555,12 @@
           correct,
           correct
             ? "You picked the right door and answered correctly. Nicely done!"
-            : "The correct answer was deep-frying. Give it another try?"
+            : `The correct answer was ${currentQuestion.choices[currentQuestion.correct]}. Give it another try?`
         );
-      });
     });
 
     document.querySelector("#retry").addEventListener("click", startRound);
+    updateHud();
     startRound();
   </script>
 </body>
